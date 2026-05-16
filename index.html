@@ -4,12 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AR Floating Notes System</title>
-    
-    <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/gh/hiukim/mind-ar-js@1.1.4/dist/mindar-image-aframe.prod.js"></script>
-    
-    <script src="https://unpkg.com/aframe-html-shader@0.2.0/dist/aframe-html-shader.min.js"></script>
-    
     <style>
         * {
             margin: 0;
@@ -23,185 +17,385 @@
             width: 100%;
             height: 100%;
             overflow: hidden;
-            background-color: #030712;
+            background-color: #050b14;
         }
 
-        /* Fixed Brand Floating Overlay Header HUD */
-        #brand-header {
+        /* Camera Feed Layer */
+        #camera-stream {
             position: fixed;
-            top: 20px;
+            top: 50%;
             left: 50%;
-            transform: translateX(-50%);
-            z-index: 10;
-            background: rgba(15, 23, 42, 0.65);
+            min-width: 100%;
+            min-height: 100%;
+            width: auto;
+            height: auto;
+            z-index: 1;
+            transform: translate(-50%, -50%);
+            object-fit: cover;
+        }
+
+        /* Ambient background blur that turns on during card Focus Mode */
+        #focus-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(3, 7, 18, 0.4);
+            backdrop-filter: blur(0px);
+            -webkit-backdrop-filter: blur(0px);
+            z-index: 2;
+            pointer-events: none;
+            transition: all 0.4s ease;
+        }
+        body.card-focused #focus-overlay {
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            background: rgba(3, 7, 18, 0.6);
+        }
+
+        /* AR Dashboard Grid Workspace */
+        #ar-viewport {
+            position: fixed;
+            width: 100%;
+            height: 100%;
+            z-index: 3;
+            perspective: 1200px;
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            grid-template-rows: repeat(2, 1fr);
+            gap: 20px;
+            padding: 100px 30px 120px 30px;
+            opacity: 0; 
+            transition: opacity 0.5s ease;
+        }
+
+        /* Glassmorphism Note Containers */
+        .glass-note {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            max-width: 400px;
+            max-height: 250px;
+            justify-self: center;
+            align-self: center;
+            padding: 20px;
+            background: rgba(10, 20, 38, 0.5); 
             backdrop-filter: blur(12px);
             -webkit-backdrop-filter: blur(12px);
-            padding: 12px 28px;
-            border-radius: 30px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
             color: #fff;
-            text-align: center;
-            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
-            pointer-events: none;
+            transform-style: preserve-3d;
+            pointer-events: auto;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+            cursor: pointer;
+            transition: transform 0.5s cubic-bezier(0.25, 1, 0.5, 1), 
+                        opacity 0.4s ease, 
+                        box-shadow 0.4s ease, 
+                        background 0.4s ease;
         }
 
-        #brand-header h1 {
-            font-size: 1.1rem;
-            letter-spacing: 3px;
-            font-weight: 700;
-            color: #00f3ff;
-            text-shadow: 0 0 10px rgba(0, 243, 255, 0.5);
+        /* Hover Feedback when idle */
+        .glass-note:hover {
+            background: rgba(15, 32, 60, 0.65);
+            box-shadow: 0 15px 35px rgba(0,0,0,0.4);
         }
 
-        /* Off-screen cache container holding the source HTML designs */
-        #html-target-cache {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 512px;
-            height: 512px;
-            overflow: hidden;
-            pointer-events: none;
-            opacity: 0;
-            z-index: -999;
-        }
+        /* Color Theme Borders and Soft Glow Effects */
+        .theme-cyan { border: 2px solid rgba(0, 243, 255, 0.4); }
+        .theme-purple { border: 2px solid rgba(186, 85, 211, 0.4); }
+        .theme-blue { border: 2px solid rgba(30, 144, 255, 0.4); }
+        .theme-magenta { border: 2px solid rgba(255, 0, 127, 0.4); }
 
-        /* Glassmorphic AR Note Panel Layout Styling */
-        .glass-card {
-            width: 450px;
-            padding: 30px;
-            background: rgba(15, 23, 42, 0.85);
-            border-radius: 24px;
-            color: #fff;
-        }
-
-        .glass-card h2 {
-            font-size: 2rem;
-            margin-bottom: 15px;
-            padding-bottom: 10px;
-            border-bottom: 2px solid rgba(255, 255, 255, 0.15);
-            text-transform: uppercase;
+        .glass-note h2 {
+            font-size: 1.15rem;
             letter-spacing: 2px;
+            margin-bottom: 12px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+            padding-bottom: 6px;
+            text-transform: uppercase;
         }
 
-        .card-cyan { border: 4px solid #00f3ff; }
-        .card-cyan h2 { color: #00f3ff; }
-        
-        .card-blue { border: 4px solid #1e90ff; }
-        .card-blue h2 { color: #1e90ff; }
-        
-        .card-purple { border: 4px solid #ba55d3; }
-        .card-purple h2 { color: #ba55d3; }
+        .theme-cyan h2 { color: #00f3ff; }
+        .theme-purple h2 { color: #ba55d3; }
+        .theme-blue h2 { color: #1e90ff; }
+        .theme-magenta h2 { color: #ff007f; }
 
-        .card-magenta { border: 4px solid #ff007f; margin-top: 20px; }
-        .card-magenta h2 { color: #ff007f; }
+        .note-content { font-size: 0.88rem; line-height: 1.5; color: #e2e8f0; }
+        .task-row { display: flex; align-items: center; margin: 6px 0; }
+        .task-row input { margin-right: 10px; width: 15px; height: 15px; }
+        ul { padding-left: 20px; }
 
-        .task-row { display: flex; align-items: center; margin: 12px 0; font-size: 1.4rem; }
-        .task-row input { margin-right: 15px; width: 22px; height: 22px; }
-        ul { padding-left: 25px; font-size: 1.3rem; line-height: 1.6; }
-        p { font-size: 1.3rem; line-height: 1.5; }
+        /* CRITICAL DYNAMICS: Active Focus Mode Class States */
+        .glass-note.focused {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            width: 90%;
+            height: auto;
+            max-width: 480px;
+            max-height: 320px;
+            transform: translate(-50%, -50%) scale(1.15) rotateX(0deg) rotateY(0deg) !important;
+            z-index: 100;
+            background: rgba(15, 28, 54, 0.9);
+            box-shadow: 0 30px 70px rgba(0, 0, 0, 0.6);
+        }
+        
+        .theme-cyan.focused { border-color: #00f3ff; box-shadow: 0 0 35px rgba(0, 243, 255, 0.4); }
+        .theme-purple.focused { border-color: #ba55d3; box-shadow: 0 0 35px rgba(186, 85, 211, 0.4); }
+        .theme-blue.focused { border-color: #1e90ff; box-shadow: 0 0 35px rgba(30, 144, 255, 0.4); }
+        .theme-magenta.focused { border-color: #ff007f; box-shadow: 0 0 35px rgba(255, 0, 127, 0.4); }
+
+        /* Dims unselected neighbor notes when one note is clicked into focus */
+        body.card-focused .glass-note:not(.focused) {
+            opacity: 0.25;
+            pointer-events: none;
+            transform: scale(0.9) !important;
+        }
+
+        /* Bottom Fixed Action Menu Dock Bar */
+        #hud-container {
+            position: fixed;
+            bottom: 25px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 5;
+            background: rgba(255, 255, 255, 0.07);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            padding: 10px 24px;
+            border-radius: 40px;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            opacity: 0; 
+            transition: opacity 0.5s ease;
+        }
+
+        .hud-btn {
+            background: none;
+            border: none;
+            color: #fff;
+            font-size: 0.9rem;
+            font-weight: 600;
+            padding: 10px 20px;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .main-action { background: #00f3ff; color: #000; box-shadow: 0 0 15px rgba(0,243,255,0.4); }
+
+        /* Full Screen Permission Overlay Screen */
+        #permission-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: #090f1d;
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            text-align: center;
+            padding: 30px;
+        }
+        #permission-overlay h1 { color: #00f3ff; margin-bottom: 10px; font-size: 1.6rem;}
+        #permission-overlay p { color: #8a99ad; margin-bottom: 30px; font-size: 0.95rem;}
+
+        /* Creation Form Dialog Modal Box Window */
+        #input-modal {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(5, 10, 20, 0.85);
+            z-index: 110;
+            display: none;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-box {
+            background: #111928;
+            border: 1px solid rgba(255,255,255,0.1);
+            width: 320px; padding: 25px; border-radius: 16px; color: #fff;
+        }
+        .modal-box h3 { margin-bottom: 15px; color: #00f3ff; }
+        .modal-box input, .modal-box textarea {
+            width: 100%; padding: 10px; background: #1f2a37; border: 1px solid #374151;
+            border-radius: 8px; color: white; margin-bottom: 12px; outline: none;
+        }
     </style>
-
-    <script>
-        // Custom A-Frame component to simulate floating 3D hover animations
-        AFRAME.registerComponent('floating-note', {
-            schema: { speed: {type: 'float', default: 1.5}, amplitude: {type: 'float', default: 0.05} },
-            init: function () {
-                this.initialY = this.el.object3D.position.y;
-                this.time = 0;
-            },
-            tick: function (time, timeDelta) {
-                this.time += timeDelta / 1000;
-                let newY = this.initialY + Math.sin(this.time * this.data.speed) * this.data.amplitude;
-                this.el.object3D.position.y = newY;
-            }
-        });
-    </script>
 </head>
 <body>
 
-    <div id="brand-header">
-        <h1>AR FLOATING NOTES</h1>
+    <video id="camera-stream" autoplay playsinline></video>
+
+    <div id="focus-overlay" onclick="clearFocus()"></div>
+
+    <div id="permission-overlay">
+        <h1>AR Floating Notes System</h1>
+        <p>Immersive Multi-Panel Floating Workspace.</p>
+        <button class="hud-btn main-action" onclick="initializeSystem()">Start AR</button>
     </div>
 
-    <div id="html-target-cache">
-        <div id="desk-card-html" class="glass-card card-cyan">
-            <h2>Desk Reminders</h2>
-            <div class="task-row"><input type="checkbox" checked> <span>Complete Assignment</span></div>
-            <div class="task-row"><input type="checkbox"> <span>Study UI/UX Design</span></div>
-            <div class="task-row"><input type="checkbox"> <span>Practice Dev Algorithms</span></div>
+    <div id="ar-viewport">
+        <div class="glass-note theme-cyan" id="note-0" onclick="toggleNoteFocus(this)">
+            <h2>AR Floating Notes</h2>
+            <div class="note-content">
+                <div class="task-row"><input type="checkbox" checked onclick="event.stopPropagation()"><span>Complete Assignment</span></div>
+                <div class="task-row"><input type="checkbox" onclick="event.stopPropagation()"><span>Study UI/UX Design</span></div>
+                <div class="task-row"><input type="checkbox" onclick="event.stopPropagation()"><span>Practice Dev Algorithms</span></div>
+            </div>
         </div>
 
-        <div id="book-card-html" class="glass-card card-blue">
-            <h2>Microprocessor Notes</h2>
-            <ul>
-                <li>Internal Register Configurations</li>
-                <li>ALU Operation Cycles & Flags</li>
-                <li>System Control Bus Routing Line Mapping</li>
-            </ul>
+        <div class="glass-note theme-purple" id="note-1" onclick="toggleNoteFocus(this)">
+            <h2>Stay Focused</h2>
+            <div class="note-content">
+                <p style="font-style: italic; text-align: center; margin-top: 10px;">
+                    "Small disciplined progress made daily leads to massive academic consistency."
+                </p>
+            </div>
         </div>
 
-        <div id="wall-card-html" class="glass-card card-purple">
-            <h2>Wall Timetable</h2>
-            <p style="margin-bottom: 8px;"><strong>08:00 AM</strong> - UI/UX Architecture Lab</p>
-            <p><strong>10:30 AM</strong> - Data Structures & Algos</p>
+        <div class="glass-note theme-blue" id="note-2" onclick="toggleNoteFocus(this)">
+            <h2>Microprocessor</h2>
+            <div class="note-content">
+                <strong>Core System Architecture:</strong>
+                <ul>
+                    <li>Internal Register Array Structures</li>
+                    <li>ALU operational computing cycles</li>
+                    <li>System Control Bus data lines</li>
+                </ul>
+            </div>
         </div>
 
-        <div id="quote-card-html" class="glass-card card-magenta">
-            <h2>Daily Focus Quote</h2>
-            <p style="font-style: italic; text-align: center;">
-                "Small disciplined progress made daily leads to massive academic consistency."
-            </p>
+        <div class="glass-note theme-magenta" id="note-3" onclick="toggleNoteFocus(this)">
+            <h2>Monday Plan</h2>
+            <div class="note-content">
+                <p><strong>08:00 AM</strong> - UI/UX Architecture Lab</p>
+                <p><strong>10:30 AM</strong> - Data Structures & Algos</p>
+                <p><strong>02:00 PM</strong> - Microprocessor Review</p>
+            </div>
         </div>
     </div>
 
-    <a-scene mindar-image="imageTargetSrc: ./targets.mind;" 
-             color-space="sRGB" 
-             renderer="colorManagement: true, physicallyCorrectLights: true" 
-             vr-mode-ui="enabled: false" 
-             device-orientation-permission-ui="enabled: false">
-        
-        <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+    <div id="hud-container">
+        <button class="hud-btn main-action" onclick="openCreateModal()">Add Note (+)</button>
+    </div>
 
-        <a-entity mindar-image-target="targetIndex: 0">
-            <a-plane position="0 0 0.1" 
-                     rotation="0 0 0" 
-                     width="1" 
-                     height="0.7" 
-                     material="shader: html; target: #desk-card-html; transparent: true;"
-                     floating-note="speed: 1.5; amplitude: 0.04">
-            </a-plane>
-        </a-entity>
+    <div id="input-modal">
+        <div class="modal-box">
+            <h3>Add New Panel Card</h3>
+            <input type="text" id="form-title" placeholder="ENTER NOTE TITLE">
+            <textarea id="form-body" rows="4" placeholder="Type structural note parameters..."></textarea>
+            <div style="display:flex; gap:10px; justify-content: flex-end;">
+                <button class="hud-btn" onclick="closeCreateModal()" style="color:#aaa;">Cancel</button>
+                <button class="hud-btn main-action" onclick="createNewNote()" style="padding: 6px 14px;">Create</button>
+            </div>
+        </div>
+    </div>
 
-        <a-entity mindar-image-target="targetIndex: 1">
-            <a-plane position="0 0 0.1" 
-                     rotation="0 0 0" 
-                     width="1" 
-                     height="0.7" 
-                     material="shader: html; target: #book-card-html; transparent: true;"
-                     floating-note="speed: 1.2; amplitude: 0.03">
-            </a-plane>
-        </a-entity>
+    <script>
+        const video = document.getElementById('camera-stream');
+        const viewport = document.getElementById('ar-viewport');
+        const hud = document.getElementById('hud-container');
+        let totalCardsCount = 4;
 
-        <a-entity mindar-image-target="targetIndex: 2">
-            <a-plane position="0 0.25 0.1" 
-                     rotation="0 0 0" 
-                     width="1" 
-                     height="0.5" 
-                     material="shader: html; target: #wall-card-html; transparent: true;"
-                     floating-note="speed: 1.0; amplitude: 0.03">
-            </a-plane>
+        // Step 1: Initialize Camera Stream Viewport securely
+        async function initializeSystem() {
+            document.getElementById('permission-overlay').style.display = 'none';
             
-            <a-plane position="0 -0.3 0.1" 
-                     rotation="0 0 0" 
-                     width="1" 
-                     height="0.4" 
-                     material="shader: html; target: #quote-card-html; transparent: true;"
-                     floating-note="speed: 1.0; amplitude: 0.03">
-            </a-plane>
-        </a-entity>
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: "environment" },
+                    audio: false
+                });
+                video.srcObject = stream;
+                onCameraSuccess();
+            } catch (err) {
+                navigator.mediaDevices.getUserMedia({ video: true })
+                    .then(stream => {
+                        video.srcObject = stream;
+                        onCameraSuccess();
+                    })
+                    .catch(e => console.error("Camera access failed:", e));
+            }
 
-    </a-scene>
+            // Hook Gyroscope stabilization matrices safely
+            if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+                DeviceOrientationEvent.requestPermission()
+                    .then(state => {
+                        if (state === 'granted') window.addEventListener('deviceorientation', handleGyroStabilization);
+                    }).catch(console.error);
+            } else {
+                window.addEventListener('deviceorientation', handleGyroStabilization);
+            }
+        }
 
+        function onCameraSuccess() {
+            viewport.style.opacity = "1";
+            hud.style.opacity = "1";
+        }
+
+        // Step 2: Gyro Tilt Matrix Engine (Only runs when no card is focused)
+        function handleGyroStabilization(e) {
+            if (document.body.classList.contains('card-focused')) return;
+
+            const cards = document.querySelectorAll('.glass-note');
+            let rotX = (e.beta - 60) * 0.35; 
+            let rotY = e.gamma * 0.35;
+
+            cards.forEach(card => {
+                card.style.transform = `rotateX(${rotX}deg) rotateY(${rotY}deg) translateZ(15px)`;
+            });
+        }
+
+        // Step 3: Interactive Click Note Selection Focus Mechanics
+        function toggleNoteFocus(cardElement) {
+            if (cardElement.classList.contains('focused')) {
+                clearFocus();
+            } else {
+                clearFocus(); // clear any previous focus states safely
+                document.body.classList.add('card-focused');
+                cardElement.classList.add('focused');
+            }
+        }
+
+        function clearFocus() {
+            document.body.classList.remove('card-focused');
+            document.querySelectorAll('.glass-note').forEach(card => {
+                card.classList.remove('focused');
+                card.style.transform = 'rotateX(0deg) rotateY(0deg) translateZ(0px)';
+            });
+        }
+
+        // Step 4: Add and Generate Custom Sub-Notes Panels Matrix
+        function openCreateModal() { document.getElementById('input-modal').style.display = 'flex'; }
+        function closeCreateModal() { document.getElementById('input-modal').style.display = 'none'; }
+
+        function createNewNote() {
+            let title = document.getElementById('form-title').value;
+            let body = document.getElementById('form-body').value;
+
+            if(!title || !body) return alert("Please fill out all fields.");
+
+            // Color rotation styling logic
+            const themes = ['theme-cyan', 'theme-purple', 'theme-blue', 'theme-magenta'];
+            let assignedTheme = themes[totalCardsCount % 4];
+
+            // Build dynamic DOM architecture card nodes
+            let newCardNode = document.createElement('div');
+            newCardNode.className = `glass-note ${assignedTheme}`;
+            newCardNode.id = `note-${totalCardsCount}`;
+            newCardNode.onclick = function() { toggleNoteFocus(this); };
+            
+            newCardNode.innerHTML = `
+                <h2>${title}</h2>
+                <div class="note-content">
+                    <p>${body.replace(/\n/g, '<br>')}</p>
+                </div>
+            `;
+
+            viewport.appendChild(newCardNode);
+            totalCardsCount++;
+
+            closeCreateModal();
+            document.getElementById('form-title').value = "";
+            document.getElementById('form-body').value = "";
+        }
+    </script>
 </body>
 </html>
