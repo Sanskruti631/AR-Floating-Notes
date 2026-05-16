@@ -26,7 +26,7 @@
             background-color: #030712;
         }
 
-        /* Fixed Brand Floating Overlay Header HUD */
+        /* Fixed Brand Floating Overlay Header HUD Layout */
         #brand-header {
             position: fixed;
             top: 20px;
@@ -53,7 +53,7 @@
             text-shadow: 0 0 10px rgba(0, 243, 255, 0.5);
         }
 
-        /* Essential Viewport Position Fix for HTML-Shader Rendering Compatibility */
+        /* HTML Shader Asset Source Cache Configuration */
         #html-target-cache {
             position: absolute;
             top: 0;
@@ -66,7 +66,7 @@
             z-index: -999;
         }
 
-        /* Glassmorphic AR Note Panel Layout Styling */
+        /* UI Card Designs */
         .glass-card {
             width: 450px;
             padding: 30px;
@@ -103,7 +103,7 @@
     </style>
 
     <script>
-        // Custom A-Frame component to simulate floating, physics-defying 3D hover animations
+        // Custom Float Hover Physics Engine Animation Component
         AFRAME.registerComponent('floating-note', {
             schema: { speed: {type: 'float', default: 1.5}, amplitude: {type: 'float', default: 0.05} },
             init: function () {
