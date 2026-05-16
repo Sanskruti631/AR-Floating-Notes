@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Study Desk AR - Full System</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Roboto, sans-serif;
+            user-select: none;
+        }
+
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #050b14;
+        }
+
+        /* Camera Feed Layer */
+        #camera-stream {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            min-width: 100%;
+            min-height: 100%;
+            width: auto;
+            height: auto;
+            z-index: 1;
+            transform: translate(-50%, -50%);
+            object-fit: cover;
+        }
+
+        /* AR 3D Viewport Matrix */
+        #ar-viewport {
+            position: fixed;
+            width: 100%;
+            height: 100%;
+            z-index: 2;
+            perspective: 1200px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            pointer-events: none;
+        }
+
+        /* Glassmorphism Note Canvas Container */
+        .glass-note {
+            width: 320px;
+            min-height: 220px;
+            padding: 25px;
+            background: rgba(10, 20, 38, 0.5); 
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-radius: 20px;
+            color: #fff;
+            transform-style: preserve-3d;
+            display: none; /* Controlled via JS switching */
+            pointer-events: auto;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.3);
+            transition: transform 0.1s ease-out, opacity 0.3s ease;
+        }
+
+        /* Theme Colored Glowing Borders */
+        .theme-cyan { border: 2px solid rgba(0, 243, 255, 0.6); box-shadow: 0 0 25px rgba(0, 243, 255, 0.25); }
+        .theme-purple { border: 2px solid rgba(186, 85, 211, 0.6); box-shadow: 0 0 25px rgba(186, 85, 211, 0.25); }
+        .theme-blue { border: 2px solid rgba(30, 144, 255, 0.6); box-shadow: 0 0 25px rgba(30, 144, 255, 0.25); }
+        .theme-magenta { border: 2px solid rgba(255, 0, 127, 0.6); box-shadow: 0 0 25px rgba(255, 0, 127, 0.25); }
+
+        .glass-note h2 {
+            font-size: 1.25rem;
+            letter-spacing: 2px;
+            margin-bottom: 15px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+            padding-bottom: 8px;
+            text-transform: uppercase;
+        }
+
+        .theme-cyan h2 { color: #00f3ff; text-shadow: 0 0 8px rgba(0, 243, 255, 0.5); }
+        .theme-purple h2 { color: #ba55d3; text-shadow: 0 0 8px rgba(186, 85, 211, 0.5); }
+        .theme-blue h2 { color: #1e90ff; text-shadow: 0 0 8px rgba(30, 144, 255, 0.5); }
+        .theme-magenta h2 { color: #ff007f; text-shadow: 0 0 8px rgba(255, 0, 127, 0.5); }
+
+        /* Typography Lists Content Stylings */
+        .note-content { font-size: 0.95rem; line-height: 1.6; }
+        .task-row { display: flex; align-items: center; margin: 8px 0; }
+        .task-row input { margin-right: 10px; width: 16px; height: 16px; }
+
+        /* Fixed Footer Navigation HUD */
+        #hud-container {
+            position: fixed;
+            bottom: 25px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 4;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: rgba(255, 255, 255, 0.07);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            padding: 10px 20px;
+            border-radius: 40px;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+        }
+
+        .hud-btn {
+            background: none;
+            border: none;
+            color: #fff;
+            font-size: 0.9rem;
+            font-weight: 600;
+            padding: 10px 16px;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .hud-btn:active { background: rgba(255, 255, 255, 0.15); }
+        .main-action { background: #00f3ff; color: #000; box-shadow: 0 0 15px rgba(0,243,255,0.4); }
+        .main-action:active { background: #00c2cc; }
+
+        /* Full Screen Calibrate/Permission Cover Layer Overlay */
+        #permission-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: #090f1d;
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: #white;
+            text-align: center;
+            padding: 30px;
+        }
+
+        #permission-overlay h1 { color: #00f3ff; margin-bottom: 10px; font-size: 1.6rem;}
+        #permission-overlay p { color: #8a99ad; margin-bottom: 30px; font-size: 0.95rem; max-width: 280px;}
+
+        /* Creation Input Dialog Form Popup Modal window */
+        #input-modal {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(5, 10, 20, 0.85);
+            z-index: 5;
+            display: none;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-box {
+            background: #111928;
+            border: 1px solid rgba(255,255,255,0.1);
+            width: 300px; padding: 25px; border-radius: 16px; color: #fff;
+        }
+
+        .modal-box h3 { margin-bottom: 15px; color: #00f3ff; }
+        .modal-box input, .modal-box textarea {
+            width: 100%; padding: 10px; background: #1f2a37; border: 1px solid #374151;
+            border-radius: 8px; color: white; margin-bottom: 12px; outline: none;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Camera stream layer -->
+    <video id="camera-stream" autoplay playsinline></video>
+
+    <!-- Calibration / Activation Entry Barrier Screen Overlay -->
+    <div id="permission-overlay">
+        <h1>SMART STUDY DESK</h1>
+        <p>Immersive AR Floating Notes Engine Dashboard Submission Tool.</p>
+        <button class="hud-btn main-action" onclick="initializeSystem()">INITIALIZE AR</button>
+    </div>
+
+    <!-- Interactive Floating Note Stack Cards Viewports -->
+    <div id="ar-viewport">
+        <!-- Card 1: Daily Tasks -->
+        <div class="glass-note theme-cyan" id="note-0" style="display: block;">
+            <h2>Today's Tasks</h2>
+            <div class="note-content">
+                <div class="task-row"><input type="checkbox" checked><span>Complete Assignment</span></div>
+                <div class="task-row"><input type="checkbox"><span>Study UI/UX Design</span></div>
+                <div class="task-row"><input type="checkbox"><span>Practice Dev Algorithms</span></div>
+            </div>
+        </div>
+
+        <!-- Card 2: Motivation Notes -->
+        <div class="glass-note theme-purple" id="note-1">
+            <h2>Stay Focused</h2>
+            <div class="note-content">
+                <p style="font-style: italic; font-size: 1.1rem; text-align: center; margin-top: 15px;">
+                    "Small disciplined progress made daily leads to massive academic consistency."
+                </p>
+            </div>
+        </div>
+
+        <!-- Card 3: Revision Cards -->
+        <div class="glass-note theme-blue" id="note-2">
+            <h2>Microprocessor</h2>
+            <div class="note-content">
+                <strong>Key Summary Concepts:</strong>
+                <ul>
+                    <li>Internal Register Array Structures</li>
+                    <li>ALU execution cycles</li>
+                    <li>System Control Bus routing architectures</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Card 4: Timetable Panels -->
+        <div class="glass-note theme-magenta" id="note-3">
+            <h2>Monday Plan</h2>
+            <div class="note-content">
+                <p><strong>08:00 AM</strong> - UI/UX Architecture Lab</p>
+                <p><strong>10:30 AM</strong> - Data Structures & Algos</p>
+                <p><strong>02:00 PM</strong> - Microprocessor Review</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- HUD Overlay System Bottom Navigation Dock Menu -->
+    <div id="hud-container">
+        <button class="hud-btn" onclick="switchNote(-1)">BACK</button>
+        <button class="hud-btn main-action" onclick="openCreateModal()">+</button>
+        <button class="hud-btn" onclick="switchNote(1)">NEXT</button>
+    </div>
+
+    <!-- Dialog Popup Form Modal Engine -->
+    <div id="input-modal" id="inputModal">
+        <div class="modal-box">
+            <h3>Add Custom Note</h3>
+            <input type="text" id="form-title" placeholder="ENTER NOTE TITLE">
+            <textarea id="form-body" rows="4" placeholder="Type structural contents here..."></textarea>
+            <div style="display:flex; gap:10px; justify-content: flex-end;">
+                <button class="hud-btn" onclick="closeCreateModal()" style="color:#aaa;">Cancel</button>
+                <button class="hud-btn main-action" onclick="saveCustomNote()" style="padding: 6px 14px;">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let activeIndex = 0;
+        const totalNotes = 4;
+        const video = document.getElementById('camera-stream');
+        const viewport = document.getElementById('ar-viewport');
+
+        // Step 1: Initialize Camera Stream and Request Gyro Permissions
+        async function initializeSystem() {
+            document.getElementById('permission-overlay').style.display = 'none';
+            
+            // Start Camera
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: { exact: "environment" } },
+                    audio: false
+                });
+                video.srcObject = stream;
+            } catch (err) {
+                navigator.mediaDevices.getUserMedia({ video: true })
+                    .then(stream => video.srcObject = stream)
+                    .catch(e => console.error("Camera access failed:", e));
+            }
+
+            // Bind Gyroscope tracking hooks
+            if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+                DeviceOrientationEvent.requestPermission()
+                    .then(state => {
+                        if (state === 'granted') window.addEventListener('deviceorientation', handleGyroMovement);
+                    }).catch(console.error);
+            } else {
+                window.addEventListener('deviceorientation', handleGyroMovement);
+            }
+        }
+
+        // Step 2: Spatial Gyro Coordinates Renderer Matrix Engine
+        function handleGyroMovement(e) {
+            let currentCard = document.getElementById(`note-${activeIndex}`);
+            if (!currentCard) return;
+
+            // Normalize device angles for comfortable hand holding positioning angles
+            let rotX = (e.beta - 60) * 0.75; 
+            let rotY = e.gamma * 0.75;
+
+            // Inject 3D transform matrices directly into live DOM CSS property slots
+            currentCard.style.transform = `rotateX(${rotX}deg) rotateY(${rotY}deg) translateZ(30px)`;
+        }
+
+        // Step 3: Scene Switching Layer Navigation Array Filter
+        function switchNote(direction) {
+            // Hide current card UI view visibility instance
+            document.getElementById(`note-${activeIndex}`).style.display = 'none';
+
+            // Increment/Decrement active arrays
+            activeIndex += direction;
+            if (activeIndex >= totalNotes) activeIndex = 0;
+            if (activeIndex < 0) activeIndex = totalNotes - 1;
+
+            // Show target card frame instance cleanly
+            let nextCard = document.getElementById(`note-${activeIndex}`);
+            nextCard.style.display = 'block';
+        }
+
+        // Step 4: Popup Modal Controls for Creating Dynamic Custom Notes
+        function openCreateModal() { document.getElementById('input-modal').style.display = 'flex'; }
+         Zion
+        function closeCreateModal() { document.getElementById('input-modal').style.display = 'none'; }
+
+        function saveCustomNote() {
+            let title = document.getElementById('form-title').value;
+            let body = document.getElementById('form-body').value;
+
+            if(!title || !body) return alert("Please populate text forms.");
+
+            // Inject the custom note into the currently visible active panel layer slot framework
+            let activeCard = document.getElementById(`note-${activeIndex}`);
+            activeCard.querySelector('h2').innerText = title;
+            activeCard.querySelector('.note-content').innerHTML = `<p>${body.replace(/\n/g, '<br>')}</p>`;
+
+            closeCreateModal();
+            // Clear standard value arrays strings
+            document.getElementById('form-title').value = "";
+            document.getElementById('form-body').value = "";
+        }
+    </script>
+</body>
+</html>
