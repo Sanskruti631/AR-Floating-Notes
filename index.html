@@ -7,7 +7,8 @@
     
     <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
     <script src="https://cdn.jsdelivr.net/gh/hiukim/mind-ar-js@1.1.4/dist/mindar-image-aframe.prod.js"></script>
-    <script src="https://unpkg.com/aframe-html-shader@1.6.7/dist/aframe-html-shader.min.js"></script>
+    
+    <script src="https://unpkg.com/aframe-html-shader@0.2.0/dist/aframe-html-shader.min.js"></script>
     
     <style>
         * {
@@ -52,7 +53,7 @@
             text-shadow: 0 0 10px rgba(0, 243, 255, 0.5);
         }
 
-        /* Off-screen cache container holding the source HTML designs to prevent clutter */
+        /* Essential Viewport Position Fix for HTML-Shader Rendering Compatibility */
         #html-target-cache {
             position: absolute;
             top: 0;
@@ -167,7 +168,7 @@
                      rotation="0 0 0" 
                      width="1" 
                      height="0.7" 
-                     material="shader: html; target: #desk-card-html; transparent: true; ratio: back"
+                     material="shader: html; target: #desk-card-html; transparent: true;"
                      floating-note="speed: 1.5; amplitude: 0.04">
             </a-plane>
         </a-entity>
@@ -177,7 +178,7 @@
                      rotation="0 0 0" 
                      width="1" 
                      height="0.7" 
-                     material="shader: html; target: #book-card-html; transparent: true; ratio: back"
+                     material="shader: html; target: #book-card-html; transparent: true;"
                      floating-note="speed: 1.2; amplitude: 0.03">
             </a-plane>
         </a-entity>
@@ -187,7 +188,7 @@
                      rotation="0 0 0" 
                      width="1" 
                      height="0.5" 
-                     material="shader: html; target: #wall-card-html; transparent: true; ratio: back"
+                     material="shader: html; target: #wall-card-html; transparent: true;"
                      floating-note="speed: 1.0; amplitude: 0.03">
             </a-plane>
             
@@ -195,7 +196,7 @@
                      rotation="0 0 0" 
                      width="1" 
                      height="0.4" 
-                     material="shader: html; target: #quote-card-html; transparent: true; ratio: back"
+                     material="shader: html; target: #quote-card-html; transparent: true;"
                      floating-note="speed: 1.0; amplitude: 0.03">
             </a-plane>
         </a-entity>
